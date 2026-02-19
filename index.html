@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Water Quality Visualizer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- PapaParse for CSV parsing -->
+  <script src="lib/papaparse.min.js"></script>
+  <!-- Chart.js for visualizations -->
+  <script src="lib/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     HEADER
+════════════════════════════════════════ -->
+<header>
+  <span class="logo">💧</span>
+  <div>
+    <h1>Water Quality Visualizer</h1>
+    <p>Upload a CSV file and explore your water quality data through interactive charts</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Error box ── -->
+  <div id="error-box" class="alert alert-danger hidden" role="alert"></div>
+
+  <!-- ════════════════════════════════════════
+       UPLOAD CARD
+  ════════════════════════════════════════ -->
+  <section class="card" id="upload-card">
+    <div class="card-header">
+      <span>📂</span>
+      <h2>Load Data</h2>
+    </div>
+    <div class="card-body">
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".csv" />
+        <span class="upload-icon">📊</span>
+        <p><strong>Drag &amp; drop a CSV file here</strong><br>
+           or click to browse your files</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-accent" id="sample-btn">▶ Load Sample Dataset</button>
+        <span style="color:var(--text-light);font-size:0.85rem;line-height:2">
+          Try the built-in 12-month, 3-site water quality dataset
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       APP SECTION (hidden until data loaded)
+  ════════════════════════════════════════ -->
+  <div id="app-section" class="hidden">
+
+    <!-- ── Dataset info ── -->
+    <section class="card">
+      <div class="card-header"><span>ℹ️</span><h2>Dataset Overview</h2></div>
+      <div class="card-body">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+          <div>
+            <span style="color:var(--text-light);font-size:0.82rem">File</span><br>
+            <strong id="file-name">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-light);font-size:0.82rem">Rows</span><br>
+            <strong id="row-count">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-light);font-size:0.82rem">Columns</span><br>
+            <strong id="col-count">—</strong>
+          </div>
+        </div>
+        <div id="stats-grid" class="stats-grid"></div>
+      </div>
+    </section>
+
+    <!-- ── Chart card ── -->
+    <section class="card">
+      <div class="card-header"><span>📈</span><h2>Visualization</h2></div>
+
+      <!-- Chart type tabs -->
+      <div class="chart-tabs">
+        <button class="tab-btn active" data-type="line">Line Chart</button>
+        <button class="tab-btn" data-type="bar">Bar Chart</button>
+        <button class="tab-btn" data-type="area">Area Chart</button>
+        <button class="tab-btn" data-type="scatter">Scatter Plot</button>
+      </div>
+
+      <div class="card-body">
+        <!-- Controls -->
+        <div class="controls-grid" style="margin-bottom:16px">
+          <div class="control-group">
+            <label for="x-axis">X-Axis / Labels</label>
+            <select id="x-axis"></select>
+          </div>
+          <div class="control-group">
+            <label for="color-by">Group / Color By</label>
+            <select id="color-by"></select>
+          </div>
+          <div class="control-group">
+            <!-- hidden select kept for JS compatibility; tabs control type -->
+            <select id="chart-type-sel" class="hidden"></select>
+          </div>
+        </div>
+
+        <!-- Parameter selector -->
+        <div style="margin-bottom:16px">
+          <label style="font-size:0.82rem;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:8px">
+            Parameters to display
+          </label>
+          <div id="param-checks" class="param-checkboxes"></div>
+        </div>
+
+        <button class="btn btn-primary" id="render-btn">🔄 Update Chart</button>
+
+        <!-- Chart canvas -->
+        <div class="chart-wrapper" style="margin-top:20px">
+          <canvas id="main-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── WQI card ── -->
+    <section class="card" id="wqi-section">
+      <div class="card-header"><span>🏅</span><h2>Water Quality Index by Site</h2></div>
+      <div class="card-body">
+        <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:12px">
+          Simplified composite index (0–100) based on EPA-recognised parameters. Higher = better.
+        </p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Site / Location</th>
+                <th>Readings</th>
+                <th>WQI Score</th>
+              </tr>
+            </thead>
+            <tbody id="wqi-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Data table card ── -->
+    <section class="card">
+      <div class="card-header"><span>📋</span><h2>Data Table</h2></div>
+      <div class="card-body" style="padding:0">
+        <div class="table-container">
+          <table>
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /app-section -->
+
+</main>
+
+<script src="app.js"></script>
+<script>
+/* ── Chart type tab switching ── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('chart-type-sel').value = btn.dataset.type;
+    renderChart();
+  });
+});
+
+/* Sync hidden select with tab on load */
+document.getElementById('chart-type-sel').innerHTML =
+  '<option value="line">Line</option>' +
+  '<option value="bar">Bar</option>' +
+  '<option value="area">Area</option>' +
+  '<option value="scatter">Scatter</option>';
+document.getElementById('chart-type-sel').value = 'line';
+</script>
+</body>
+</html>
